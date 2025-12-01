@@ -1,0 +1,14 @@
+{
+  "name": "scraptk",
+  "title": "Scrap Toolkit",
+  "description": "Modding API for automatically modifying recipes with byproducts.",
+  "author": "SafTheLamb + S6X",
+  "version": "1.0.0",
+  "factorio_version": "2.0",
+  "package": {
+    "ignore": ["thumbnail.af", "**/*.af", "**/*.ase", "**/*.af~lock~", "**/*.pdn"]
+  },
+  "dependencies": [
+    "base >= 2.0.72"
+  ]
+}
