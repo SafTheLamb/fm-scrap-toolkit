@@ -2,36 +2,40 @@ local global_byproduct_scale = settings.startup["scraptk-byproduct-scale"].value
 local global_failrate_scale = settings.startup["scraptk-failrate-scale"].value
 local global_failrate_min = settings.startup["scraptk-failrate-min"].value
 
+for _,item_metadata in pairs(ScrapIndustry.items) do
+	ScrapIndustry.convert_to_stk(item_metadata)
+end
+
 local function get_ingredient_scrap(ingredient, out)
 	local item_metadata = ScrapIndustry.items[ingredient.name]
-	if item_metadata and not out.recipe_results[item_metadata.scrap] then
-		-- In fluid mode, only check for scrap from fluid ingredients or fluid byproducts
-		if out.fluid_mode then
-			if ingredient.type ~= "fluid" then
-				local product_metadata = ScrapIndustry.products[item_metadata.scrap]
-				if not (product_metadata and product_metadata.type == "fluid") then
-					return
+	if item_metadata then
+		for scrap_name,scale in pairs(item_metadata.scrap or {}) do
+			-- Don't add byproducts that are already a result
+			if out.recipe_results[scrap_name] then
+				goto continue
+			end
+			-- If we're in fluid mode, only accept byproducts from fluid inputs OR fluid byproducts
+			if out.fluid_mode then
+				if ingredient.type ~= "fluid" then
+					local product_metadata = ScrapIndustry.products[scrap_name]
+					if not (product_metadata and product_metadata.type == "fluid") then
+						goto continue
+					end
 				end
 			end
-		end
-
-		if item_metadata.scale then
-			local amount = item_metadata.scale * (ingredient.amount or ((ingredient.amount_min + ingredient.amount_max)/2))
+			-- Calculate how much scrap
+			local amount = scale * (ingredient.amount or ((ingredient.amount_min + ingredient.amount_max)/2))
 			if ingredient.type == "fluid" then
 				amount = amount / ScrapIndustry.FLUID_SCALE
 			end
 			amount = global_byproduct_scale * amount
 			amount = math.floor(100 * amount + 0.5) / 100
-			if type(item_metadata.scrap) == "string" then
-				out.byproducts[item_metadata.scrap] = (out.byproducts[item_metadata.scrap] or 0) + amount
-				out.total_scrap = out.total_scrap + amount
-			else
-				for _,scrap_name in pairs(item_metadata.scrap) do
-					out.byproducts[scrap_name] = (out.byproducts[scrap_name] or 0) + amount
-					out.total_scrap = out.total_scrap + amount
-				end
-			end
+			-- Accumulate the scrap
+			out.byproducts[scrap_name] = (out.byproducts[scrap_name] or 0) + amount
+			out.total_scrap = out.total_scrap + amount
+			::continue::
 		end
+		-- Failrate is still calculated per ingredient, not per byproduct
 		if item_metadata.failrate then
 			out.success_penalty = (out.success_penalty or 0) + item_metadata.failrate
 		end
@@ -457,32 +461,43 @@ end
 local default_machine_tints = {primary = {0.125,0.125,0.125,0.125}, secondary = {0.125,0.125,0.125,0.125}, tertiary = {0.125,0.125,0.125,0.125}, quaternary = {0.125,0.125,0.125,0.125}}
 
 if mods["quality"] then
-	for item_name,scrap_metadata in pairs(ScrapIndustry.items) do
+	for item_name,item_metadata in pairs(ScrapIndustry.items) do
 		local item = data.raw.item[item_name]
-		if item and scrap_metadata.recycle then
-			local icons = generate_recycling_recipe_icons_from_item(item)
-			local crafting_machine_tint = data.raw.recipe[item.name] and data.raw.recipe[item.name].crafting_machine_tint or default_machine_tints
-			local amount = math.ceil(scrap_metadata.recycle/4)
-			local probability = 0.5*(scrap_metadata.recycle/4)/amount
-			probability = math.ceil(probability*1000)/1000
-			data:extend({
-				{
-					type = "recipe",
-					name = item.name.."-recycling",
-					localised_name = {"recipe-name.recycling", get_item_localised_name(item.name)},
-					icons = icons,
-					category = "recycling",
-					subgroup = item.subgroup,
-					hidden = true,
-					enabled = true,
-					unlock_results = false,
-					allow_decomposition = false,
-					ingredients = {{type="item", name=item.name, amount=1, ignored_by_stats=1}},
-					results = {{type="item", name=scrap_metadata.scrap, amount=amount, probability=probability, ignored_by_stats=amount}},
-					energy_required = (data.raw.recipe[item.name] and data.raw.recipe[item.name].energy_required or 0.5 )/16,
-					crafting_machine_tint = crafting_machine_tint
-				},
-			})
+		if item and item_metadata.recycle then
+			-- Find the main byproduct
+			local main_byproduct = nil
+			local highest_scale = 0
+			for scrap_name,scale in pairs(item_metadata.scrap) do
+				if scale > highest_scale then
+					main_byproduct = scrap_name
+					highest_scale = scale
+				end
+			end
+			if main_byproduct then
+				local icons = generate_recycling_recipe_icons_from_item(item)
+				local crafting_machine_tint = data.raw.recipe[item.name] and data.raw.recipe[item.name].crafting_machine_tint or default_machine_tints
+				local amount = math.ceil(item_metadata.recycle/4)
+				local probability = 0.5*(item_metadata.recycle/4)/amount
+				probability = math.ceil(probability*1000)/1000
+				data:extend({
+					{
+						type = "recipe",
+						name = item.name.."-recycling",
+						localised_name = {"recipe-name.recycling", get_item_localised_name(item.name)},
+						icons = icons,
+						category = "recycling",
+						subgroup = item.subgroup,
+						hidden = true,
+						enabled = true,
+						unlock_results = false,
+						allow_decomposition = false,
+						ingredients = {{type="item", name=item_name, amount=1, ignored_by_stats=1}},
+						results = {{type="item", name=main_byproduct, amount=amount, probability=probability, ignored_by_stats=amount}},
+						energy_required = (data.raw.recipe[item_name] and data.raw.recipe[item_name].energy_required or 0.5)/16,
+						crafting_machine_tint = crafting_machine_tint
+					},
+				})
+			end
 		end
 	end
 end
