@@ -15,6 +15,14 @@ data:extend({
 		default_value = true,
 		order = "a[misc]-b[handcraft]"
 	},
+	
+	{
+		type = "bool-setting",
+		name = "scraptk-failrate-enable",
+		setting_type = "startup",
+		default_value = true,
+		order = "b[failrate]-a[enabled]"
+	},
 	{
 		type = "double-setting",
 		name = "scraptk-failrate-scale",
@@ -22,7 +30,7 @@ data:extend({
 		default_value = 1,
 		minimum_value = 0.1,
 		maximum_value = 5,
-		order = "b[failrate]-a[scale]"
+		order = "b[failrate]-b[scale]"
 	},
 	{
 		type = "double-setting",
@@ -31,6 +39,6 @@ data:extend({
 		default_value = 0.01,
 		minimum_value = 0,
 		maximum_value = 0.2,
-		order = "b[failrate]-b[min]"
+		order = "b[failrate]-c[min]"
 	},
 })
