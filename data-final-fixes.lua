@@ -1,6 +1,8 @@
+local global_failrate_allowed = settings.startup["scraptk-failrate-enable"].value
 local global_byproduct_scale = settings.startup["scraptk-byproduct-scale"].value
 local global_failrate_scale = settings.startup["scraptk-failrate-scale"].value
 local global_failrate_min = settings.startup["scraptk-failrate-min"].value
+
 
 for _,item_metadata in pairs(ScrapIndustry.items) do
 	ScrapIndustry.convert_to_stk(item_metadata)
@@ -36,7 +38,7 @@ local function get_ingredient_scrap(ingredient, out)
 			::continue::
 		end
 		-- Failrate is still calculated per ingredient, not per byproduct
-		if item_metadata.failrate then
+		if global_failrate_allowed and item_metadata.failrate then
 			out.success_penalty = (out.success_penalty or 0) + item_metadata.failrate
 		end
 	end
@@ -94,6 +96,9 @@ if settings.startup["scraptk-handcraft"].value then
 end
 
 local function should_duplicate_for_hand_crafting(recipe, recipe_metadata, out)
+	if not global_failrate_allowed then
+		return false
+	end
 	if not settings.startup["scraptk-handcraft"].value then
 		return false
 	end
@@ -324,14 +329,16 @@ for _,recipe in pairs(data.raw.recipe) do
 			end
 		end
 
-		if type(recipe_metadata.failrate) == "number" then
-			out.success_penalty = recipe_metadata.failrate
-		elseif out.total_scrap > 0 then
-			local failrate_scale = 1 / (out.total_scrap / (2*ScrapIndustry.LEGENDARY))
-			if failrate_scale < 1 then
-				out.success_penalty = math.max(math.ceil(failrate_scale * out.success_penalty * 100) / 100, global_failrate_min)
+		if global_failrate_allowed then
+			if type(recipe_metadata.failrate) == "number" then
+				out.success_penalty = recipe_metadata.failrate
+			elseif out.total_scrap > 0 then
+				local failrate_scale = 1 / (out.total_scrap / (2*ScrapIndustry.LEGENDARY))
+				if failrate_scale < 1 then
+					out.success_penalty = math.max(math.ceil(failrate_scale * out.success_penalty * 100) / 100, global_failrate_min)
+				end
+				out.success_penalty = math.max(global_failrate_scale * out.success_penalty, global_failrate_min)
 			end
-			out.success_penalty = math.max(global_failrate_scale * out.success_penalty, global_failrate_min)
 		end
 	
 		local cancel_gen = false
