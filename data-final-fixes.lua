@@ -3,7 +3,6 @@ local global_byproduct_scale = settings.startup["scraptk-byproduct-scale"].value
 local global_failrate_scale = settings.startup["scraptk-failrate-scale"].value
 local global_failrate_min = settings.startup["scraptk-failrate-min"].value
 
-
 for _,item_metadata in pairs(ScrapIndustry.items) do
 	ScrapIndustry.convert_to_stk(item_metadata)
 end
@@ -97,6 +96,9 @@ end
 
 local function should_duplicate_for_hand_crafting(recipe, recipe_metadata, out)
 	if not global_failrate_allowed then
+		return false
+	end
+	if not settings.startup["scraptk-failrate-enable"].value then
 		return false
 	end
 	if not settings.startup["scraptk-handcraft"].value then
@@ -299,6 +301,16 @@ end
 
 --------------------------------------------------------------------------------------------------
 
+local byproduct_rounding = settings.startup["scraptk-byproduct-rounding"].value
+
+local function get_rounded(probability)
+	if probability < 0.05 then return 0.05 end
+	if probability < 0.10 then return 0.10 end
+	if probability < 0.25 then return 0.25 end
+	if probability < 0.33 then return 0.33 end
+	return 0.5
+end
+
 for _,recipe in pairs(data.raw.recipe) do
 	if can_modify_recipe(recipe) then
 		local out = {
@@ -392,8 +404,11 @@ for _,recipe in pairs(data.raw.recipe) do
 					local product_metadata = ScrapIndustry.products[scrap_name]
 					local product_type = product_metadata and product_metadata.type or "item"
 					local halved_amount = scrap_amount / 0.5
-					local random_scale = 1 + 0.12 * (1 - 2 * math.random())
+					local random_scale = 1 + (byproduct_rounding and 0 or 0.12 * (1 - 2 * math.random()))
 					local probability = math.floor(100 * random_scale * scrap_amount / math.ceil(halved_amount)) / 100
+					if byproduct_rounding then
+						probability = get_rounded(probability)
+					end
 					local final_amount = halved_amount / 0.5
 					local fluidbox_index = nil
 					if product_type == "fluid" then
@@ -410,16 +425,23 @@ for _,recipe in pairs(data.raw.recipe) do
 						out.fluid_count = out.fluid_count + 1
 					end
 					if final_amount > 1 then final_amount = math.sqrt(final_amount) end
-					local amount_min = math.max(1, math.floor(0.9 * final_amount + 0.5))
-					local amount_max = math.max(1, math.floor(1.1 * final_amount + 0.5))
+					local amount_min = byproduct_rounding and final_amount or math.max(1, math.floor(0.9 * final_amount + 0.5))
+					local amount_max = byproduct_rounding and final_amount or math.max(1, math.floor(1.1 * final_amount + 0.5))
 					local result = {type=product_type, name=scrap_name, probability=probability, show_details_in_recipe_tooltip=false}
 					if amount_min ~= amount_max then
 						result.amount_min = amount_min
 						result.amount_max = amount_max
-						result.ignored_by_productivity=amount_max
+						result.ignored_by_productivity = amount_max
 					else
+						if final_amount > 4 then
+							if final_amount > 10 then
+								final_amount = math.floor(final_amount / 5) * 5
+							else
+								final_amount = math.floor(final_amount / 2) * 2
+							end
+						end
 						result.amount = math.ceil(final_amount)
-						result.ignored_by_productivity=result.amount
+						result.ignored_by_productivity = result.amount
 					end
 					result.si_modified = true
 					result.fluidbox_index = fluidbox_index
