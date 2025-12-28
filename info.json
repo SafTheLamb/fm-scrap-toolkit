@@ -4,7 +4,7 @@
 	"description": "Modding API for automatically modifying recipes with byproducts.",
 	"author": "SafTheLamb, S6X",
 	"homepage": "https://github.com/SafTheLamb/fm-scrap-toolkit",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"factorio_version": "2.0",
 	"package": {
 		"ignore": ["thumbnail.af", "**/*.af", "**/*.ase", "**/*.af~lock~", "**/*.pdn"]
